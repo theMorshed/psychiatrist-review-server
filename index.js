@@ -10,6 +10,7 @@ const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 app.use(cors());
 app.use(express.json());
 
+// custom middleware for jwt token verification
 function verifyJWT(req, res, next) {
     const authHeader = req.headers.authorization;
 
@@ -27,29 +28,31 @@ function verifyJWT(req, res, next) {
     })
 }
 
-
 // mongodb driver code
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@cluster0.zkjorm4.mongodb.net/?retryWrites=true&w=majority`;
 const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true, serverApi: ServerApiVersion.v1 });
 
 async function run() {
     try {
-        
+
         const serviceCollection = client.db('psychiatrist').collection('services');
         const reviewCollection = client.db('psychiatrist').collection('reviews');
 
+        // jwt token api
         app.post('/jwt', (req, res) => {
             const user = req.body;
             const token = jwt.sign(user, process.env.SECRET_ACCESS_TOKEN, { expiresIn: '1h' })
             res.send({ token });
-        }); 
+        });
 
+        // add service api
         app.post('/service/add', async (req, res) => {
             const service = req.body;
             const result = await serviceCollection.insertOne(service);
             res.send(result);
         });
 
+        // get 3 service api for homepage
         app.get('/services', async (req, res) => {
             const query = {};
             const cursor = serviceCollection.find(query);
@@ -57,6 +60,7 @@ async function run() {
             res.send(services);
         });
 
+        // get all service api for services page
         app.get('/all-services', async (req, res) => {
             const query = {};
             const cursor = serviceCollection.find(query);
@@ -64,6 +68,7 @@ async function run() {
             res.send(services);
         });
 
+        // get a single service according to id
         app.get('/service/:id', async (req, res) => {
             const id = req.params.id;
             const query = { _id: ObjectId(id) };
@@ -71,9 +76,10 @@ async function run() {
             res.send(service);
         });
 
+        // get all reviews with jwt token verification
         app.get('/reviews/:email', verifyJWT, async (req, res) => {
             const decoded = req.decoded;
-            if (decoded.email !== req.query.email) {
+            if (decoded.email !== req.params.email) {
                 res.status(403).send({ message: 'unauthorized access' })
             }
 
@@ -83,12 +89,14 @@ async function run() {
             res.send(reviews);
         });
 
+        // add a new review api
         app.post('/review/add', async (req, res) => {
             const review = req.body;
             const result = await reviewCollection.insertOne(review);
             res.send(result);
         });
 
+        // get all all review of a single service
         app.get('/review/:id', async (req, res) => {
             const id = req.params.id;
             const query = { service_id: id };
@@ -96,6 +104,7 @@ async function run() {
             res.send(reviews);
         });
 
+        // get single review for update
         app.get('/single-review/:id', async (req, res) => {
             const id = req.params.id;
             const query = { _id: ObjectId(id) };
@@ -103,6 +112,7 @@ async function run() {
             res.send(review);
         });
 
+        // update review api
         app.put('/update/:id', async (req, res) => {
             const review = req.body;
             const id = req.params.id;
@@ -117,6 +127,7 @@ async function run() {
             res.send(result);
         });
 
+        // delete review api
         app.delete('/reviews/:id', async (req, res) => {
             const id = req.params.id;
             const query = { _id: ObjectId(id) };
